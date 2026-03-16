@@ -213,7 +213,16 @@ struct whey80_client_window *whey80_window_create(struct whey80_client *client,
 }
 
 void whey80_window_destroy(struct whey80_client_window *window) {
-  (void)window;
+  if (!window)
+    return;
+  whey80_shm_buffer_destroy(window->buffer);
+  if (window->xdg_toplevel)
+    xdg_toplevel_destroy(window->xdg_toplevel);
+  if (window->xdg_surface)
+    xdg_surface_destroy(window->xdg_surface);
+  if (window->surface)
+    wl_surface_destroy(window->surface);
+  free(window);
 }
 
 struct whey80_shm_buffer *whey80_shm_buffer_create(struct whey80_client *client,
