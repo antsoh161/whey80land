@@ -16,15 +16,16 @@ static void handle_toplevel_commit(struct wl_listener *listener, void *data) {
 }
 
 static void handle_toplevel_map(struct wl_listener *listener, void *data) {
+  (void)data;
   struct whey_toplevel *toplevel = wl_container_of(listener, toplevel, map);
 
   wl_list_insert(&toplevel->server->toplevels, &toplevel->link);
 
   wlr_log(WLR_INFO, "Toplevel mapped: %s (%s)",
           toplevel->xdg_toplevel->title ? toplevel->xdg_toplevel->title
-                                        : "(no title",
+                                        : "(no title)",
           toplevel->xdg_toplevel->app_id ? toplevel->xdg_toplevel->app_id
-                                         : "(no app_id");
+                                         : "(no app_id)");
 }
 
 static void handle_toplevel_unmap(struct wl_listener *listener, void *data) {
@@ -100,10 +101,15 @@ void handle_new_toplevel(struct wl_listener *listener, void *data) {
   wl_signal_add(&surface->events.commit, &toplevel->commit);
 
   toplevel->destroy.notify = handle_toplevel_destroy;
-  wl_signal_add(&surface->events.destroy, &toplevel->commit);
+  wl_signal_add(&surface->events.destroy, &toplevel->destroy);
 
-  /* toplevel->request_maximize.notify = handle_toplevel_request_maximize; */
-  /* wl_signal_add(&surface->events.destroy, struct wl_listener *listener) */
+  toplevel->request_maximize.notify = handle_toplevel_request_maximize;
+  wl_signal_add(&xdg_toplevel->events.request_maximize,
+                &toplevel->request_maximize);
+
+  toplevel->request_fullscreen.notify = handle_toplevel_request_fullscreen;
+  wl_signal_add(&xdg_toplevel->events.request_fullscreen,
+                &toplevel->request_fullscreen);
 
   wlr_log(WLR_INFO, "New toplevel created");
 }
