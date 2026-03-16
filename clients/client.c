@@ -207,6 +207,10 @@ void whey80_window_destroy(struct whey80_client_window *window) {
 struct whey80_shm_buffer *whey80_shm_buffer_create(struct whey80_client *client,
                                                    int width, int height) {
   struct whey80_shm_buffer *buf = calloc(1, sizeof(*buf));
+  if (!buf) {
+    return NULL;
+  }
+
   buf->width = width;
   buf->height = height;
   /* ARGB888 => 4 bytes per pixel */
@@ -237,15 +241,11 @@ struct whey80_shm_buffer *whey80_shm_buffer_create(struct whey80_client *client,
   }
 
   struct wl_shm_pool *pool = wl_shm_create_pool(client->shm, fd, buf->size);
-
-  /* Pool has a reference to fd */
-  close(fd);
+  close(fd); /* Pool has a reference to fd */
 
   buf->buffer = wl_shm_pool_create_buffer(pool, 0, buf->width, buf->height,
                                           buf->stride, WL_SHM_FORMAT_ARGB8888);
-
-  /* Not needed anymore, buffer still valid */
-  wl_shm_pool_destroy(pool);
+  wl_shm_pool_destroy(pool); /* Not needed anymore, buffer still valid */
 
   return buf;
 }
@@ -253,11 +253,11 @@ struct whey80_shm_buffer *whey80_shm_buffer_create(struct whey80_client *client,
 void whey80_shm_buffer_destroy(struct whey80_shm_buffer *buf) {
   if (!buf)
     return;
+  if (buf->pixels && buf->pixels != MAP_FAILED) {
+    munmap(buf->pixels, buf->size);
+  }
   if (buf->buffer) {
     wl_buffer_destroy(buf->buffer);
-  }
-  if (buf->pixels) {
-    munmap(buf->pixels, buf->size);
   }
   free(buf);
 }
