@@ -152,7 +152,26 @@ struct whey80_client *whey80_client_connect(void) {
   return client;
 }
 
-void whey80_client_destroy(struct whey80_client *client) { (void)client; }
+void whey80_client_destroy(struct whey80_client *client) {
+  if (!client)
+    return;
+  if (client->xdg_wm_base) {
+    xdg_wm_base_destroy(client->xdg_wm_base);
+  }
+  if (client->shm) {
+    wl_shm_destroy(client->shm);
+  }
+  if (client->compositor) {
+    wl_compositor_destroy(client->compositor);
+  }
+  if (client->registry) {
+    wl_registry_destroy(client->registry);
+  }
+  if (client->display) {
+    wl_display_disconnect(client->display);
+  }
+  free(client);
+}
 
 void whey80_client_run(struct whey80_client *client) {
   client->running = true;
