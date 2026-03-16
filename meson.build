@@ -37,6 +37,7 @@ executable(
     'src/main.c',
     'src/output.c',
     'src/server.c',
+    'src/xdg_shell.c'
   ),
   xdg_shell_server_header,
   dependencies: [wlroots, wayland_server, xkbcommon],

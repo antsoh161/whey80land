@@ -21,9 +21,15 @@ struct whey_server {
 
   struct wlr_output_layout *output_layout;
 
+  struct wlr_xdg_shell *xdg_shell;
+
   struct wl_listener new_output;
 
+   struct wl_listener new_xdg_toplevel;
+
   struct wl_list outputs;
+
+   struct wl_list toplevels;
 };
 
 bool server_init(struct whey_server *server);

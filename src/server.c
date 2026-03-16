@@ -1,5 +1,6 @@
 #include "server.h"
 #include "output.h"
+#include "src/xdg_shell.h"
 
 #include <wlr/render/allocator.h>
 #include <wlr/render/wlr_renderer.h>
@@ -39,6 +40,12 @@ bool server_init(struct whey_server *server) {
   wlr_compositor_create(server->wl_display, 6, server->renderer);
   wlr_subcompositor_create(server->wl_display);
 
+  server->xdg_shell = wlr_xdg_shell_create(server->wl_display, 6);
+  if (!server->xdg_shell) {
+    wlr_log(WLR_ERROR, "Failed to create wlr_xdg_shell");
+    goto err_allocator;
+  }
+
   server->scene = wlr_scene_create();
   if (!server->scene) {
     wlr_log(WLR_ERROR, "Failed to create wlr_scene");
@@ -56,8 +63,13 @@ bool server_init(struct whey_server *server) {
 
   wl_list_init(&server->outputs);
 
+  wl_list_init(&server->toplevels);
   server->new_output.notify = handle_new_output;
   wl_signal_add(&server->backend->events.new_output, &server->new_output);
+
+  server->new_xdg_toplevel.notify = handle_new_toplevel;
+  wl_signal_add(&server->xdg_shell->events.new_toplevel,
+                &server->new_xdg_toplevel);
 
   return true;
 
