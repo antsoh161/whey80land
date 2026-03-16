@@ -101,7 +101,7 @@ void handle_new_toplevel(struct wl_listener *listener, void *data) {
   wl_signal_add(&surface->events.commit, &toplevel->commit);
 
   toplevel->destroy.notify = handle_toplevel_destroy;
-  wl_signal_add(&surface->events.destroy, &toplevel->destroy);
+  wl_signal_add(&xdg_toplevel->events.destroy, &toplevel->destroy);
 
   toplevel->request_maximize.notify = handle_toplevel_request_maximize;
   wl_signal_add(&xdg_toplevel->events.request_maximize,
