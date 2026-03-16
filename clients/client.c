@@ -25,9 +25,9 @@ static void xdg_toplevel_configure(void *data,
 }
 
 static void xdg_toplevel_close(void *data, struct xdg_toplevel *xdg_toplevel) {
-  /* TODO: set client->running = false */
-  (void)data;
   (void)xdg_toplevel;
+  struct whey80_client_window *window = data;
+  window->client->running = false;
 }
 
 static void xdg_toplevel_configure_bounds(void *data,
@@ -66,6 +66,7 @@ static void xdg_surface_configure(void *data, struct xdg_surface *xdg_surface,
   */
   if (!window->configured) {
     window->configured = true;
+    whey80_draw_frame(window);
     whey80_submit_frame(window);
     return;
   }
@@ -118,37 +119,30 @@ static const struct wl_registry_listener registry_listener = {
 
 struct whey80_client *whey80_client_connect(void) {
   struct whey80_client *client = calloc(1, sizeof(*client));
-  client->display = wl_display_connect(NULL);
+  if (!client)
+    return NULL;
+
+  client->display = wl_display_connect(NULL); /* reads $WAYLAND_DISPLAY */
   if (!client->display) {
-    fprintf(stderr, "Failed to connect, is $WAYLAND_DISPLAY set?");
-    whey80_client_destroy(client);
+    fprintf(stderr, "Failed to connect to Wayland display\n");
+    free(client);
     return NULL;
   }
-  printf("Connected to: %s\n", getenv("WAYLAND_DISPLAY"));
 
-  /* Request all globals */
   client->registry = wl_display_get_registry(client->display);
   wl_registry_add_listener(client->registry, &registry_listener, client);
-  /* Flush and block until we have received all registry events */
+
   wl_display_roundtrip(client->display);
 
-  if (!client->compositor) {
-    fprintf(stderr, "Failed to acquire wl_compositor from registry\n");
+  if (!client->compositor || !client->shm || !client->xdg_wm_base) {
+    fprintf(stderr, "Missing required globals (compositor=%p shm=%p xdg=%p)\n",
+            (void *)client->compositor, (void *)client->shm,
+            (void *)client->xdg_wm_base);
     whey80_client_destroy(client);
     return NULL;
   }
 
-  if (!client->shm) {
-    fprintf(stderr, "Failed to acquire wl_shm from registry\n");
-    whey80_client_destroy(client);
-    return NULL;
-  }
-
-  if (!client->xdg_wm_base) {
-    fprintf(stderr, "Failed to acquire xdg_wm_base from registry\n");
-    whey80_client_destroy(client);
-    return NULL;
-  }
+  client->running = true;
   return client;
 }
 
@@ -174,7 +168,6 @@ void whey80_client_destroy(struct whey80_client *client) {
 }
 
 void whey80_client_run(struct whey80_client *client) {
-  client->running = true;
   while (client->running) {
     if (wl_display_dispatch(client->display) < 0) {
       fprintf(stderr, "Display dispatch error: %s", strerror(errno));
@@ -298,7 +291,6 @@ static const struct wl_callback_listener frame_listener = {
 };
 
 void whey80_submit_frame(struct whey80_client_window *window) {
-  whey80_draw_frame(window);
   wl_surface_attach(window->surface, window->buffer->buffer, 0, 0);
   wl_surface_damage_buffer(window->surface, 0, 0, window->width,
                            window->height);
