@@ -1,8 +1,9 @@
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include "client.h"
 #include <wayland-client-core.h>
 #include <wayland-client-protocol.h>
-#include <wayland-server-protocol.h>
 #include <xdg-shell-client-protocol.h>
 
 #include <errno.h>
@@ -16,12 +17,15 @@ static void xdg_toplevel_configure(void *data,
                                    struct xdg_toplevel *xdg_toplevel,
                                    int32_t width, int32_t height,
                                    struct wl_array *states) {
-  /* TODO: handle resize / state changes */
-  (void)data;
   (void)xdg_toplevel;
-  (void)width;
-  (void)height;
   (void)states;
+  struct whey80_client_window *window = data;
+
+  if (width > 0 && height > 0) {
+    window->width = width;
+    window->height = height;
+    /* TODO: Reallocate */
+  }
 }
 
 static void xdg_toplevel_close(void *data, struct xdg_toplevel *xdg_toplevel) {
@@ -61,11 +65,12 @@ static void xdg_surface_configure(void *data, struct xdg_surface *xdg_surface,
   xdg_surface_ack_configure(xdg_surface, serial);
   struct whey80_client_window *window = data;
 
-  /* We only care about initial configure for now, the others are skipped.
-     Every configure must be ack'd though, according to wayland protocol
-  */
   if (!window->configured) {
     window->configured = true;
+
+    window->buffer =
+        whey80_shm_buffer_create(window->client, window->width, window->height);
+
     whey80_draw_frame(window);
     whey80_submit_frame(window);
     return;
@@ -179,36 +184,34 @@ struct whey80_client_window *whey80_window_create(struct whey80_client *client,
                                                   int width, int height,
                                                   const char *title) {
   struct whey80_client_window *window = calloc(1, sizeof(*window));
-  window->height = height;
+  if (!window)
+    return NULL;
+
+  window->client = client;
   window->width = width;
+  window->height = height;
   window->title = title;
-  window->buffer =
-      whey80_shm_buffer_create(client, window->width, window->height);
-  if (!window->buffer) {
-    whey80_window_destroy(window);
-    return NULL;
-  }
+
+  /* Layer 1: wl_surface */
   window->surface = wl_compositor_create_surface(client->compositor);
-  if (!window->surface) {
-    whey80_window_destroy(window);
-    return NULL;
-  }
-  /* Make wl_surface an xdg_surface */
+
+  /* Layer 2: xdg_surface */
   window->xdg_surface =
       xdg_wm_base_get_xdg_surface(client->xdg_wm_base, window->surface);
-
   xdg_surface_add_listener(window->xdg_surface, &surface_listener, window);
 
-  /* This is now a toplevel surface */
+  /* Layer 3: xdg_toplevel */
   window->xdg_toplevel = xdg_surface_get_toplevel(window->xdg_surface);
-  xdg_toplevel_add_listener(window->xdg_toplevel, &toplevel_listener, NULL);
+  xdg_toplevel_add_listener(window->xdg_toplevel, &toplevel_listener, window);
+  xdg_toplevel_set_title(window->xdg_toplevel, title);
 
-  xdg_toplevel_set_title(window->xdg_toplevel, window->title);
-  xdg_toplevel_set_app_id(window->xdg_toplevel, window->title);
-
-  /* commit and begin the configure/ack sequence */
+  /* Trigger the initial configure sequence.
+     This empty commit tells the compositor "I'm ready for configuration."
+     The compositor responds with configure events, which eventually call
+     our xdg_surface_configure callback above. */
   wl_surface_commit(window->surface);
 
+  client->window = window;
   return window;
 }
 
@@ -224,7 +227,6 @@ void whey80_window_destroy(struct whey80_client_window *window) {
     wl_surface_destroy(window->surface);
   free(window);
 }
-
 struct whey80_shm_buffer *whey80_shm_buffer_create(struct whey80_client *client,
                                                    int width, int height) {
   struct whey80_shm_buffer *buf = calloc(1, sizeof(*buf));
@@ -284,7 +286,9 @@ void whey80_shm_buffer_destroy(struct whey80_shm_buffer *buf) {
 }
 
 void whey80_draw_frame(struct whey80_client_window *window) {
-  window->draw(window, NULL);
+  if (window->draw && window->buffer) {
+    window->draw(window, window->user_data);
+  }
 }
 
 static void frame_done(void *data, struct wl_callback *callback,
