@@ -37,7 +37,8 @@ executable(
     'src/main.c',
     'src/output.c',
     'src/server.c',
-    'src/xdg_shell.c'
+    'src/xdg_shell.c',
+    'src/input.c',
   ),
   xdg_shell_server_header,
   dependencies: [wlroots, wayland_server, xkbcommon],
@@ -46,3 +47,4 @@ executable(
 )
 
 subdir('clients')
+subdir('tests')
