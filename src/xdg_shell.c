@@ -21,6 +21,17 @@ static void handle_toplevel_map(struct wl_listener *listener, void *data) {
 
   wl_list_insert(&toplevel->server->toplevels, &toplevel->link);
 
+  struct wlr_surface *surface = toplevel->xdg_toplevel->base->surface;
+
+  struct wlr_seat *seat = toplevel->server->seat;
+  struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(seat);
+
+  if (keyboard) {
+    wlr_seat_keyboard_notify_enter(seat, surface, keyboard->keycodes,
+                                   keyboard->num_keycodes,
+                                   &keyboard->modifiers);
+  }
+
   wlr_log(WLR_INFO, "Toplevel mapped: %s (%s)",
           toplevel->xdg_toplevel->title ? toplevel->xdg_toplevel->title
                                         : "(no title)",
@@ -33,6 +44,12 @@ static void handle_toplevel_unmap(struct wl_listener *listener, void *data) {
   struct whey_toplevel *toplevel = wl_container_of(listener, toplevel, unmap);
 
   wl_list_remove(&toplevel->link);
+
+  struct wlr_seat *seat = toplevel->server->seat;
+  struct wlr_surface *focused = seat->keyboard_state.focused_surface;
+  if (focused == toplevel->xdg_toplevel->base->surface) {
+    wlr_seat_keyboard_notify_clear_focus(seat);
+  }
 
   wlr_log(WLR_INFO, "Toplevel unmapped");
 }

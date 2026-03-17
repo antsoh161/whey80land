@@ -1,4 +1,5 @@
 #include "server.h"
+#include "input.h"
 #include "output.h"
 #include "src/xdg_shell.h"
 
@@ -16,6 +17,7 @@ bool server_init(struct whey_server *server) {
   }
 
   struct wl_event_loop *loop = wl_display_get_event_loop(server->wl_display);
+  /* checks $WAYLAND_DISPLAY, $DISPLAY, otherwise DRM */
   server->backend = wlr_backend_autocreate(loop, NULL);
   if (!server->backend) {
     wlr_log(WLR_ERROR, "Failed to create wlr_backend");
@@ -58,18 +60,30 @@ bool server_init(struct whey_server *server) {
     goto err_scene;
   }
 
+  server->seat = wlr_seat_create(server->wl_display, "seat0");
+  if (!server->seat) {
+    wlr_log(WLR_ERROR, "Failed to create wlr_seat");
+    return false;
+  }
+
   server->scene_layout =
       wlr_scene_attach_output_layout(server->scene, server->output_layout);
 
   wl_list_init(&server->outputs);
 
   wl_list_init(&server->toplevels);
+
+  wl_list_init(&server->keyboards);
+
   server->new_output.notify = handle_new_output;
   wl_signal_add(&server->backend->events.new_output, &server->new_output);
 
   server->new_xdg_toplevel.notify = handle_new_toplevel;
   wl_signal_add(&server->xdg_shell->events.new_toplevel,
                 &server->new_xdg_toplevel);
+
+  server->new_input.notify = handle_new_input;
+  wl_signal_add(&server->backend->events.new_input, &server->new_input);
 
   return true;
 

@@ -23,13 +23,19 @@ struct whey_server {
 
   struct wlr_xdg_shell *xdg_shell;
 
+  struct wlr_seat *seat;
+
   struct wl_listener new_output;
 
-   struct wl_listener new_xdg_toplevel;
+  struct wl_listener new_xdg_toplevel;
+
+  struct wl_listener new_input;
 
   struct wl_list outputs;
 
-   struct wl_list toplevels;
+  struct wl_list toplevels;
+
+  struct wl_list keyboards;
 };
 
 bool server_init(struct whey_server *server);
