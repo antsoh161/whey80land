@@ -49,3 +49,12 @@ test('test_simple_client',
     include_directories: clients_inc,
   )
 )
+
+test('test_cursor',
+  executable('test_cursor',
+    'test_cursor.c',
+    dependencies: [criterion, wlroots, wayland_server, xkbcommon],
+    include_directories: src_inc,
+    c_args: ['-DWLR_USE_UNSTABLE'],
+  )
+)
