@@ -8,15 +8,23 @@
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_output_layout.h>
 #include <wlr/types/wlr_scene.h>
+#include <wlr/types/wlr_xcursor_manager.h>
 #include <wlr/util/log.h>
 
 static void handle_frame(struct wl_listener *listener, void *data) {
   (void)data;
   struct whey_output *output = wl_container_of(listener, output, frame);
+  if (!output->scene_output) {
+    wlr_log(WLR_ERROR, "scene_output is null");
+    return;
+  }
   struct wlr_scene_output *scene_output = output->scene_output;
 
+  wlr_log(WLR_DEBUG, "handle_frame called");
   /* Render the scene and submit the frame to the output */
   wlr_scene_output_commit(scene_output, NULL);
+
+   wlr_output_schedule_frame(output->wlr_output);
 
   struct timespec now;
   clock_gettime(CLOCK_MONOTONIC, &now);
@@ -85,4 +93,6 @@ void handle_new_output(struct wl_listener *listener, void *data) {
   wlr_output_layout_add_auto(server->output_layout, wlr_output);
 
   output->scene_output = wlr_scene_get_scene_output(server->scene, wlr_output);
+  wlr_xcursor_manager_load(server->cursor_mgr, wlr_output->scale);
+  wlr_cursor_set_xcursor(server->cursor, server->cursor_mgr, "default");
 }

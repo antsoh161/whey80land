@@ -1,4 +1,5 @@
 #include "server.h"
+#include "cursor.h"
 #include "input.h"
 #include "output.h"
 #include "src/xdg_shell.h"
@@ -63,11 +64,26 @@ bool server_init(struct whey_server *server) {
   server->seat = wlr_seat_create(server->wl_display, "seat0");
   if (!server->seat) {
     wlr_log(WLR_ERROR, "Failed to create wlr_seat");
-    return false;
+    goto err_scene;
   }
 
   server->scene_layout =
       wlr_scene_attach_output_layout(server->scene, server->output_layout);
+
+  server->cursor = wlr_cursor_create();
+  if (!server->cursor) {
+    wlr_log(WLR_ERROR, "Failed to create wlr_cursor");
+    goto err_scene;
+  }
+  wlr_cursor_attach_output_layout(server->cursor, server->output_layout);
+
+  server->cursor_mgr = wlr_xcursor_manager_create(NULL, 24);
+  if (!server->cursor_mgr) {
+    wlr_log(WLR_ERROR, "Failed to create xcursor manager");
+    goto err_cursor;
+  }
+
+  server->cursor_mode = WHEY_CURSOR_PASSTHROUGH;
 
   wl_list_init(&server->outputs);
 
@@ -85,8 +101,26 @@ bool server_init(struct whey_server *server) {
   server->new_input.notify = handle_new_input;
   wl_signal_add(&server->backend->events.new_input, &server->new_input);
 
+  server->cursor_motion.notify = handle_cursor_motion;
+  wl_signal_add(&server->cursor->events.motion, &server->cursor_motion);
+
+  server->cursor_motion_absolute.notify = handle_cursor_motion_absolute;
+  wl_signal_add(&server->cursor->events.motion_absolute,
+                &server->cursor_motion_absolute);
+
+  server->cursor_button.notify = handle_cursor_button;
+  wl_signal_add(&server->cursor->events.button, &server->cursor_button);
+
+  server->cursor_axis.notify = handle_cursor_axis;
+  wl_signal_add(&server->cursor->events.axis, &server->cursor_axis);
+
+  server->cursor_frame.notify = handle_cursor_frame;
+  wl_signal_add(&server->cursor->events.frame, &server->cursor_frame);
+
   return true;
 
+err_cursor:
+  wlr_cursor_destroy(server->cursor);
 err_scene:
   wlr_scene_node_destroy(&server->scene->tree.node);
 err_allocator:
@@ -102,6 +136,8 @@ err_display:
 
 void server_finish(struct whey_server *server) {
   wl_display_destroy_clients(server->wl_display);
+  wlr_xcursor_manager_destroy(server->cursor_mgr);
+  wlr_cursor_destroy(server->cursor);
   wlr_scene_node_destroy(&server->scene->tree.node);
   wlr_allocator_destroy(server->allocator);
   wlr_renderer_destroy(server->renderer);

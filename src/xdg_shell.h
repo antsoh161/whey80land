@@ -24,6 +24,8 @@ struct whey_toplevel {
   struct wl_listener destroy;
   struct wl_listener request_maximize;
   struct wl_listener request_fullscreen;
+  struct wl_listener request_move;
+  struct wl_listener request_resize;
 };
 
 void handle_new_toplevel(struct wl_listener *listener, void *data);

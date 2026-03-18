@@ -1,4 +1,5 @@
 #include "xdg_shell.h"
+#include "cursor.h"
 #include "server.h"
 
 #include <stdlib.h>
@@ -65,6 +66,8 @@ static void handle_toplevel_destroy(struct wl_listener *listener, void *data) {
   wl_list_remove(&toplevel->destroy.link);
   wl_list_remove(&toplevel->request_maximize.link);
   wl_list_remove(&toplevel->request_fullscreen.link);
+  wl_list_remove(&toplevel->request_move.link);
+  wl_list_remove(&toplevel->request_resize.link);
 
   free(toplevel);
 }
@@ -83,6 +86,22 @@ static void handle_toplevel_request_fullscreen(struct wl_listener *listener,
   struct whey_toplevel *toplevel =
       wl_container_of(listener, toplevel, request_fullscreen);
   wlr_xdg_surface_schedule_configure(toplevel->xdg_toplevel->base);
+}
+
+static void handle_toplevel_request_move(struct wl_listener *listener,
+                                         void *data) {
+  (void)data;
+  struct whey_toplevel *toplevel =
+      wl_container_of(listener, toplevel, request_move);
+  begin_interactive_move(toplevel->server, toplevel);
+}
+
+static void handle_toplevel_request_resize(struct wl_listener *listener,
+                                           void *data) {
+  struct whey_toplevel *toplevel =
+      wl_container_of(listener, toplevel, request_resize);
+  struct wlr_xdg_toplevel_resize_event *event = data;
+  begin_interactive_resize(toplevel->server, toplevel, event->edges);
 }
 
 void handle_new_toplevel(struct wl_listener *listener, void *data) {
@@ -127,6 +146,13 @@ void handle_new_toplevel(struct wl_listener *listener, void *data) {
   toplevel->request_fullscreen.notify = handle_toplevel_request_fullscreen;
   wl_signal_add(&xdg_toplevel->events.request_fullscreen,
                 &toplevel->request_fullscreen);
+
+  toplevel->request_move.notify = handle_toplevel_request_move;
+  wl_signal_add(&xdg_toplevel->events.request_move, &toplevel->request_move);
+
+  toplevel->request_resize.notify = handle_toplevel_request_resize;
+  wl_signal_add(&xdg_toplevel->events.request_resize,
+                &toplevel->request_resize);
 
   wlr_log(WLR_INFO, "New toplevel created");
 }

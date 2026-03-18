@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <wayland-server-protocol.h>
 #include <wayland-server-core.h>
+#include <wlr/types/wlr_cursor.h>
 #include <wlr/types/wlr_seat.h>
 #include <wlr/util/log.h>
 #include <xkbcommon/xkbcommon.h>
@@ -137,15 +138,14 @@ void handle_new_input(struct wl_listener *listener, void *data) {
     keyboard_create(server, wlr_keyboard_from_input_device(device));
     break;
   case WLR_INPUT_DEVICE_POINTER:
-    wlr_log(WLR_INFO, "Pointer device detected (not yet handled): %s",
-            device->name);
+    wlr_cursor_attach_input_device(server->cursor, device);
+    wlr_log(WLR_INFO, "Pointer device added: %s", device->name);
     break;
   default:
     wlr_log(WLR_DEBUG, "Unhandled input device type: %d", device->type);
     break;
   }
 
-  uint32_t caps = WL_SEAT_CAPABILITY_KEYBOARD;
-  /* caps |= WL_SEAT_CAPABILITY_POINTER; */
+  uint32_t caps = WL_SEAT_CAPABILITY_KEYBOARD | WL_SEAT_CAPABILITY_POINTER;
   wlr_seat_set_capabilities(server->seat, caps);
 }
